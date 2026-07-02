@@ -23,6 +23,10 @@ Verwendung von:
 - **`winston`** für lokale Logs (Dateien im `logs/` Ordner).
 - **Azure Application Insights** für zentrale Logs und Metriken.
 
+**Hinweis:**
+- Für die **Entwicklungsumgebung (Dev)** gilt [`ADR-008-Logging-Umgebungsabhaengig.md`](ADR-008-Logging-Umgebungsabhaengig.md), die `context.log` (Azure Functions Standard-Logging) vorsieht.
+- Für die **Produktionsumgebung (Prod)** bleibt diese ADR gültig.
+
 ---
 
 ## Begründung
