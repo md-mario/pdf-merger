@@ -3,7 +3,7 @@
 ## 1. Laufzeitumgebung
 | Anforderung | Wert |
 |-------------|------|
-| **Runtime** | Node.js 20 (LTS) |
+| **Runtime** | Node.js 22 (LTS) |
 | **Azure Function App Plan** | Consumption Plan (serverlos, automatische Skalierung) |
 | **Trigger** | Blob Storage Trigger (ausgelöst durch Hochladen von `Master.pdf` in `pdf-input` Container) |
 
