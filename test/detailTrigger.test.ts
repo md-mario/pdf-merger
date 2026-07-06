@@ -10,7 +10,7 @@ import {
   updateMasterPdfMissingDetails,
   upsertDetailPdfEntity,
 } from "../src/infrastructure/tableStorage";
-import { mergeWithMarker } from "../src/services/pdf-merger";
+import { mergeIncrementally } from "../src/services/pdf-merger";
 import { MasterPdfRow } from "../src/contracts/input";
 import { InvocationContext } from "@azure/functions";
 
@@ -23,7 +23,9 @@ const mockUpdateMissing = updateMasterPdfMissingDetails as jest.MockedFunction<
 const mockUpsertDetail = upsertDetailPdfEntity as jest.MockedFunction<
   typeof upsertDetailPdfEntity
 >;
-const mockMerge = mergeWithMarker as jest.MockedFunction<typeof mergeWithMarker>;
+const mockMergeIncrementally = mergeIncrementally as jest.MockedFunction<
+  typeof mergeIncrementally
+>;
 
 function createMockContext(): InvocationContext {
   return {
@@ -54,13 +56,9 @@ describe("Detail Trigger", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockListPending.mockResolvedValue([masterEntity]);
-    mockUpdateMissing.mockResolvedValue(["20169310"]); // 20169310 noch fehlend
+    mockUpdateMissing.mockResolvedValue(["20169310"]);
     mockUpsertDetail.mockResolvedValue(undefined);
-    mockMerge.mockResolvedValue({
-      outputFileName: "Master_mit_Details_automatisch.pdf",
-      processedDatasets: 2,
-      warnings: [],
-    });
+    mockMergeIncrementally.mockResolvedValue(undefined);
   });
 
   it("sollte DetailPDFs-Eintrag als matched speichern und missingDetails aktualisieren", async () => {
@@ -71,28 +69,33 @@ describe("Detail Trigger", () => {
     expect(mockUpdateMissing).toHaveBeenCalledWith("Master.pdf", "202174945");
   });
 
-  it("sollte Merge nicht starten wenn noch Details fehlen", async () => {
+  // ADR-010: mergeIncrementally wird nach JEDEM Match aufgerufen (nicht erst am Ende)
+  it("sollte mergeIncrementally nach jedem Match aufrufen – auch wenn noch Details fehlen", async () => {
     mockUpdateMissing.mockResolvedValue(["20169310"]); // noch offen
     const context = createMockContext();
     await detailTrigger(Buffer.from("mock"), context, "202174945.pdf");
 
-    expect(mockMerge).not.toHaveBeenCalled();
+    expect(mockMergeIncrementally).toHaveBeenCalledWith(
+      "Master.pdf",
+      "202174945",
+      context
+    );
   });
 
-  it("sollte Merge starten wenn alle Details vorhanden sind", async () => {
+  it("sollte mergeIncrementally auch beim letzten Detail aufrufen", async () => {
     mockUpdateMissing.mockResolvedValue([]); // alle Details vorhanden
     const context = createMockContext();
     await detailTrigger(Buffer.from("mock"), context, "20169310.pdf");
 
-    expect(mockMerge).toHaveBeenCalledWith(
+    expect(mockMergeIncrementally).toHaveBeenCalledWith(
       "Master.pdf",
-      ["202174945", "20169310"],
+      "20169310",
       context
     );
   });
 
   it("sollte Warnung ausgeben und als unmatched speichern wenn kein Master gefunden", async () => {
-    mockListPending.mockResolvedValue([]); // kein passender Master
+    mockListPending.mockResolvedValue([]);
     const context = createMockContext();
     await detailTrigger(Buffer.from("mock"), context, "999999.pdf");
 
@@ -100,6 +103,22 @@ describe("Detail Trigger", () => {
       expect.stringContaining('Kein Master-PDF im Status "pending"')
     );
     expect(mockUpsertDetail).toHaveBeenCalledWith("999999.pdf", "unmatched", "");
-    expect(mockMerge).not.toHaveBeenCalled();
+    expect(mockMergeIncrementally).not.toHaveBeenCalled();
+  });
+
+  it("sollte mergeIncrementally NICHT aufrufen wenn kein Match", async () => {
+    mockListPending.mockResolvedValue([]);
+    const context = createMockContext();
+    await detailTrigger(Buffer.from("mock"), context, "000000.pdf");
+
+    expect(mockMergeIncrementally).not.toHaveBeenCalled();
+  });
+
+  it("sollte Reservierungsnummer korrekt aus Dateinamen extrahieren", async () => {
+    const context = createMockContext();
+    await detailTrigger(Buffer.from("mock"), context, "202174945.pdf");
+
+    expect(mockUpdateMissing).toHaveBeenCalledWith("Master.pdf", "202174945");
+    expect(mockMergeIncrementally).toHaveBeenCalledWith("Master.pdf", "202174945", context);
   });
 });

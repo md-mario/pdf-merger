@@ -1,13 +1,15 @@
 // ADR-005: Blob Storage Trigger auf Container "pdf-details"
 // ADR-003: Warnung bei nicht-zuordenbaren Detail-PDFs, kein Abbruch
 // ADR-003: ETag-Retry-Logik für Race Conditions
+// ADR-010: Inkrementelles Einfügen nach jedem Detail-Match
+// ADR-011: Blob-Lease über mergeIncrementally
 import { app, InvocationContext } from "@azure/functions";
 import {
   listPendingMasterEntities,
   updateMasterPdfMissingDetails,
   upsertDetailPdfEntity,
 } from "../infrastructure/tableStorage";
-import { mergeWithMarker } from "../services/pdf-merger";
+import { mergeIncrementally } from "../services/pdf-merger";
 
 /**
  * Verarbeitet eine neu hochgeladene Detail-PDF:
@@ -51,13 +53,8 @@ export async function detailTrigger(
     `detailTrigger: Verbleibende Details für "${matchedMaster.rowKey}": ${updatedMissing.length}`
   );
 
-  if (updatedMissing.length === 0) {
-    context.log(
-      `detailTrigger: Alle Details vorhanden – starte PDF-Merge für "${matchedMaster.rowKey}"`
-    );
-    const reservationNumbers: string[] = JSON.parse(matchedMaster.reservationNumbers);
-    await mergeWithMarker(matchedMaster.rowKey, reservationNumbers, context);
-  }
+  // ADR-010: Inkrementelles Einfügen bei jedem Match (nicht erst am Ende)
+  await mergeIncrementally(matchedMaster.rowKey, reservationNumber, context);
 }
 
 // Registrierung nur außerhalb von Testumgebungen (ADR-008)
