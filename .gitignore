@@ -1,0 +1,7 @@
+node_modules/
+dist/
+azurite/
+*.env
+local.settings.json
+.vscode/
+coverage/
