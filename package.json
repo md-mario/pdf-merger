@@ -1,6 +1,6 @@
 {
   "name": "pdf-merger",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "PDF-Merger mit dynamischer Detail-PDF-Einbindung",
   "main": "dist/index.js",
   "scripts": {
