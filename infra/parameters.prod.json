@@ -13,6 +13,12 @@
     },
     "environment": {
       "value": "production"
+    },
+    "appInsightsName": {
+      "value": "pdf-merger-prod-appinsights"
+    },
+    "logAnalyticsWorkspaceName": {
+      "value": "pdf-merger-prod-logs"
     }
   }
 }

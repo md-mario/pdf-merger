@@ -2,7 +2,13 @@
 // ADR-008: context.log für Entwicklungsumgebung
 import { app, InvocationContext } from "@azure/functions";
 import { getPageTexts, extractReservationNumber } from "../utils/pdfReaderAsync";
-import { upsertMasterPdfEntity } from "../infrastructure/tableStorage";
+import {
+  upsertMasterPdfEntity,
+  listUnmatchedDetailEntities,
+  upsertDetailPdfEntity,
+  updateMasterPdfMissingDetails,
+} from "../infrastructure/tableStorage";
+import { mergeIncrementally } from "../services/pdf-merger";
 
 /**
  * Verarbeitet eine neu hochgeladene Master-PDF:
@@ -40,6 +46,25 @@ export async function masterTrigger(
   context.log(
     `masterTrigger: "${name}" gespeichert – ${reservationNumbers.length} Reservierungsnummer(n): ${reservationNumbers.join(", ")}`
   );
+
+  // Rescan: "unmatched" Detail-PDFs verarbeiten, die vor dem Master hochgeladen wurden
+  // ADR-012: Prefix-Matching (gleiche Logik wie detailTrigger)
+  const unmatchedDetails = await listUnmatchedDetailEntities();
+  for (const detail of unmatchedDetails) {
+    const detailNameWithoutExt = detail.rowKey.replace(/\.pdf$/i, "");
+    const matchedResNum = reservationNumbers.find((resNum) =>
+      detailNameWithoutExt.startsWith(resNum)
+    );
+    if (!matchedResNum) continue;
+
+    context.log(
+      `masterTrigger: Rescan – Detail "${detail.rowKey}" nachträglich verarbeitet für Reservierung "${matchedResNum}"`
+    );
+
+    await upsertDetailPdfEntity(detail.rowKey, "matched", name);
+    await updateMasterPdfMissingDetails(name, matchedResNum);
+    await mergeIncrementally(name, matchedResNum, detail.rowKey, context);
+  }
 }
 
 // Registrierung nur außerhalb von Testumgebungen (ADR-008)

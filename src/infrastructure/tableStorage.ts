@@ -122,3 +122,17 @@ export async function upsertDetailPdfEntity(
     "Merge"
   );
 }
+
+export async function listUnmatchedDetailEntities(): Promise<DetailPdfRow[]> {
+  const client = getTableClient("DetailPDFs");
+  const results: DetailPdfRow[] = [];
+  const entities = client.listEntities<DetailPdfRow>({
+    queryOptions: {
+      filter: `PartitionKey eq 'DetailPDFs' and status eq 'unmatched'`,
+    },
+  });
+  for await (const entity of entities) {
+    results.push(entity as DetailPdfRow);
+  }
+  return results;
+}

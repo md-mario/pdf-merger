@@ -1,0 +1,9 @@
+.git*
+.vscode
+local.settings.json
+test
+*.test.js
+*.test.ts
+jest.config.js
+azurite/
+node_modules
