@@ -4,6 +4,7 @@
 // ADR-010: Inkrementelles Einfügen nach jedem Detail-Match
 // ADR-011: Blob-Lease über mergeIncrementally
 // ADR-012: Prefix-Matching für Detail-PDF-Zuordnung
+// ADR-015: Normalisierung von Dateinamen mit SCI-Präfix
 import { app, InvocationContext } from "@azure/functions";
 import {
   listPendingMasterEntities,
@@ -11,6 +12,7 @@ import {
   upsertDetailPdfEntity,
 } from "../infrastructure/tableStorage";
 import { mergeIncrementally } from "../services/pdf-merger";
+import { normalizeFileName } from "../utils/fileNameUtils";
 
 /**
  * Verarbeitet eine neu hochgeladene Detail-PDF:
@@ -25,7 +27,9 @@ export async function detailTrigger(
 ): Promise<void> {
   context.log(`detailTrigger: Verarbeite "${name}"`);
 
-  const detailNameWithoutExt = name.replace(/\.pdf$/i, "");
+  // ADR-015: SCI-Präfix entfernen – Matching basiert auf normalisiertem Namen
+  const normalizedName = normalizeFileName(name);
+  const detailNameWithoutExt = normalizedName.replace(/\.pdf$/i, "");
   const pendingMasters = await listPendingMasterEntities();
 
   // ADR-012: Prefix-Matching – Detail-PDF-Name beginnt mit Reservierungsnummer

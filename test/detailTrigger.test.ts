@@ -152,4 +152,36 @@ describe("Detail Trigger", () => {
     );
     expect(mockMergeIncrementally).not.toHaveBeenCalled();
   });
+
+  // ADR-015: SCI-Präfix-Tests
+  describe("SCI-Präfix Normalisierung (ADR-015)", () => {
+    it("sollte SCI-präfixierte Detail-PDF korrekt zuordnen", async () => {
+      const context = createMockContext();
+      await detailTrigger(Buffer.from("mock"), context, "SCI-202174945.pdf");
+
+      expect(mockUpsertDetail).toHaveBeenCalledWith("SCI-202174945.pdf", "matched", "Master.pdf");
+      expect(mockUpdateMissing).toHaveBeenCalledWith("Master.pdf", "202174945");
+      expect(mockMergeIncrementally).toHaveBeenCalledWith(
+        "Master.pdf", "202174945", "SCI-202174945.pdf", context
+      );
+    });
+
+    it("sollte SCI-präfixierte Detail-PDF per Prefix-Matching zuordnen (extra Ziffern)", async () => {
+      const context = createMockContext();
+      await detailTrigger(Buffer.from("mock"), context, "SCI-2021749450.pdf");
+
+      expect(mockUpsertDetail).toHaveBeenCalledWith("SCI-2021749450.pdf", "matched", "Master.pdf");
+      expect(mockUpdateMissing).toHaveBeenCalledWith("Master.pdf", "202174945");
+    });
+
+    it("sollte SCI-präfixierte Detail-PDF als unmatched markieren wenn keine Reservierung passt", async () => {
+      const context = createMockContext();
+      await detailTrigger(Buffer.from("mock"), context, "SCI-999999.pdf");
+
+      expect(context.warn).toHaveBeenCalledWith(
+        expect.stringContaining('Kein Master-PDF im Status "pending"')
+      );
+      expect(mockUpsertDetail).toHaveBeenCalledWith("SCI-999999.pdf", "unmatched", "");
+    });
+  });
 });

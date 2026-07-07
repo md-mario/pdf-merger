@@ -163,6 +163,37 @@ describe("Master Trigger", () => {
       expect(mockMergeIncrementally).toHaveBeenCalledWith("Master.pdf", "202174945", "202174945.pdf", context);
       expect(mockMergeIncrementally).toHaveBeenCalledWith("Master.pdf", "20169310", "20169310.pdf", context);
     });
+
+    // ADR-015: SCI-Präfix im Rescan
+    describe("SCI-Präfix Normalisierung im Rescan (ADR-015)", () => {
+      it("sollte SCI-präfixierte unmatched Detail nachträglich verarbeiten", async () => {
+        mockListUnmatched.mockResolvedValue([
+          makeUnmatchedDetail("SCI-202174945.pdf"),
+        ]);
+        mockUpdateMissing.mockResolvedValue([]);
+
+        const context = createMockContext();
+        await masterTrigger(Buffer.from("mock pdf"), context, "Master.pdf");
+
+        expect(mockUpsertDetail).toHaveBeenCalledWith("SCI-202174945.pdf", "matched", "Master.pdf");
+        expect(mockUpdateMissing).toHaveBeenCalledWith("Master.pdf", "202174945");
+        expect(mockMergeIncrementally).toHaveBeenCalledWith(
+          "Master.pdf", "202174945", "SCI-202174945.pdf", context
+        );
+      });
+
+      it("sollte SCI-präfixiertes Detail überspringen wenn kein Prefix passt", async () => {
+        mockListUnmatched.mockResolvedValue([
+          makeUnmatchedDetail("SCI-999999999.pdf"),
+        ]);
+
+        const context = createMockContext();
+        await masterTrigger(Buffer.from("mock pdf"), context, "Master.pdf");
+
+        expect(mockUpsertDetail).not.toHaveBeenCalled();
+        expect(mockMergeIncrementally).not.toHaveBeenCalled();
+      });
+    });
   });
 });
 

@@ -1,7 +1,9 @@
 // ADR-005: Blob Storage Trigger auf Container "pdf-input"
 // ADR-008: context.log für Entwicklungsumgebung
+// ADR-015: Normalisierung von Dateinamen mit SCI-Präfix (Rescan)
 import { app, InvocationContext } from "@azure/functions";
 import { getPageTexts, extractReservationNumber } from "../utils/pdfReaderAsync";
+import { normalizeFileName } from "../utils/fileNameUtils";
 import {
   upsertMasterPdfEntity,
   listUnmatchedDetailEntities,
@@ -51,7 +53,8 @@ export async function masterTrigger(
   // ADR-012: Prefix-Matching (gleiche Logik wie detailTrigger)
   const unmatchedDetails = await listUnmatchedDetailEntities();
   for (const detail of unmatchedDetails) {
-    const detailNameWithoutExt = detail.rowKey.replace(/\.pdf$/i, "");
+    // ADR-015: SCI-Präfix entfernen vor dem Prefix-Matching
+    const detailNameWithoutExt = normalizeFileName(detail.rowKey).replace(/\.pdf$/i, "");
     const matchedResNum = reservationNumbers.find((resNum) =>
       detailNameWithoutExt.startsWith(resNum)
     );
