@@ -247,7 +247,7 @@ describe("mergeIncrementally", () => {
 
   it("sollte Detail-PDF inkrementell einfügen und Lease korrekt verwalten (ADR-011)", async () => {
     const context = createMockContext();
-    await mergeIncrementally("Master.pdf", "202174945", context);
+    await mergeIncrementally("Master.pdf", "202174945", "202174945.pdf", context);
 
     expect(mockAcquireLease).toHaveBeenCalledWith("pdf-output", "Master_mit_Details_automatisch.pdf");
     expect(mockUploadWithLease).toHaveBeenCalledWith(
@@ -266,7 +266,7 @@ describe("mergeIncrementally", () => {
       .mockResolvedValueOnce(true); // detail exists
 
     const context = createMockContext();
-    await mergeIncrementally("Master.pdf", "202174945", context);
+    await mergeIncrementally("Master.pdf", "202174945", "202174945.pdf", context);
 
     expect(mockUploadBlobIfNotExists).toHaveBeenCalledWith(
       "pdf-output",
@@ -281,7 +281,7 @@ describe("mergeIncrementally", () => {
       .mockRejectedValueOnce(new Error("Download-Fehler")); // output download schlägt fehl
 
     const context = createMockContext();
-    await expect(mergeIncrementally("Master.pdf", "202174945", context)).rejects.toThrow();
+    await expect(mergeIncrementally("Master.pdf", "202174945", "202174945.pdf", context)).rejects.toThrow();
     expect(mockLease.release).toHaveBeenCalled();
   });
 
@@ -292,7 +292,7 @@ describe("mergeIncrementally", () => {
     mockExtractReservationNumber.mockReturnValue(null);
 
     const context = createMockContext();
-    await mergeIncrementally("Master.pdf", "202174945", context);
+    await mergeIncrementally("Master.pdf", "202174945", "202174945.pdf", context);
 
     expect(context.warn).toHaveBeenCalledWith(
       expect.stringContaining("Kein Marker")
@@ -308,7 +308,7 @@ describe("mergeIncrementally", () => {
       .mockResolvedValueOnce(false); // detail missing
 
     const context = createMockContext();
-    await mergeIncrementally("Master.pdf", "202174945", context);
+    await mergeIncrementally("Master.pdf", "202174945", "202174945.pdf", context);
 
     expect(context.warn).toHaveBeenCalledWith(
       expect.stringContaining("Detail-PDF nicht gefunden")

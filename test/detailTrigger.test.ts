@@ -78,6 +78,7 @@ describe("Detail Trigger", () => {
     expect(mockMergeIncrementally).toHaveBeenCalledWith(
       "Master.pdf",
       "202174945",
+      "202174945.pdf",
       context
     );
   });
@@ -90,6 +91,7 @@ describe("Detail Trigger", () => {
     expect(mockMergeIncrementally).toHaveBeenCalledWith(
       "Master.pdf",
       "20169310",
+      "20169310.pdf",
       context
     );
   });
@@ -119,6 +121,35 @@ describe("Detail Trigger", () => {
     await detailTrigger(Buffer.from("mock"), context, "202174945.pdf");
 
     expect(mockUpdateMissing).toHaveBeenCalledWith("Master.pdf", "202174945");
-    expect(mockMergeIncrementally).toHaveBeenCalledWith("Master.pdf", "202174945", context);
+    expect(mockMergeIncrementally).toHaveBeenCalledWith("Master.pdf", "202174945", "202174945.pdf", context);
+  });
+
+  // ADR-012: Prefix-Matching
+  it("sollte Detail-PDF per Prefix-Matching zuordnen (Dateiname beginnt mit Res.-Nr.)", async () => {
+    // Reservierungsnummer in Master: "202174945"
+    // Dateiname Detail-PDF:          "2021749450.pdf" (extra Ziffer am Ende)
+    const context = createMockContext();
+    await detailTrigger(Buffer.from("mock"), context, "2021749450.pdf");
+
+    expect(mockUpsertDetail).toHaveBeenCalledWith("2021749450.pdf", "matched", "Master.pdf");
+    expect(mockUpdateMissing).toHaveBeenCalledWith("Master.pdf", "202174945");
+    expect(mockMergeIncrementally).toHaveBeenCalledWith(
+      "Master.pdf",
+      "202174945",
+      "2021749450.pdf",
+      context
+    );
+  });
+
+  it("sollte keine Zuordnung bei nicht-passendem Prefix ausgeben", async () => {
+    // "99202174945" beginnt NICHT mit "202174945"
+    mockListPending.mockResolvedValue([masterEntity]);
+    const context = createMockContext();
+    await detailTrigger(Buffer.from("mock"), context, "99202174945.pdf");
+
+    expect(context.warn).toHaveBeenCalledWith(
+      expect.stringContaining('Kein Master-PDF im Status "pending"')
+    );
+    expect(mockMergeIncrementally).not.toHaveBeenCalled();
   });
 });

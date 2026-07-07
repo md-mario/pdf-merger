@@ -1,7 +1,17 @@
 # ADR-006: Datenmodell
 
-## Status
-Accepted
+
+### Status
+  
+Accepted (teilweise erweitert durch ADR-012 für Matching-Strategie der Detail-PDFs)
+
+---
+
+### Supersedes
+  
+Teilweise ersetzt durch:
+- ADR-012: Matching-Strategie für Detail-PDFs (Detail-PDF-Zuordnung)
+
 
 ---
 

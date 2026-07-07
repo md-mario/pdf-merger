@@ -168,13 +168,14 @@ export function findInsertionPageForReservation(
  *  2. Blob-Lease erwerben (exklusiver Schreibzugriff, ADR-011)
  *  3. Aktuelle Output-PDF laden
  *  4. Einfügeposition für diese Reservierungsnummer bestimmen
- *  5. Detail-PDF nach der Marker-Seite einfügen
+ *  5. Detail-PDF nach der Marker-Seite einfügen (ADR-012: Blob-Name ggf. mit Extra-Ziffern)
  *  6. Ergebnis mit Lease hochladen
  *  7. Lease freigeben (immer, auch bei Fehler)
  */
 export async function mergeIncrementally(
   masterFileName: string,
   reservationNumber: string,
+  detailBlobName: string, // ADR-012: tatsächlicher Blob-Name (z. B. "201468964.pdf" für Res.Nr. "20146896")
   context: InvocationContext
 ): Promise<void> {
   const masterBuffer = await downloadBlob(INPUT_CONTAINER, masterFileName);
@@ -213,8 +214,7 @@ export async function mergeIncrementally(
       return;
     }
 
-    // Schritt 5: Detail-PDF prüfen und laden
-    const detailBlobName = `${reservationNumber}.pdf`;
+    // Schritt 5: Detail-PDF prüfen und laden (ADR-012: Blob-Name kommt vom Caller)
     if (!(await blobExists(DETAILS_CONTAINER, detailBlobName))) {
       context.warn(`WARN: Detail-PDF nicht gefunden: ${detailBlobName}`);
       return;

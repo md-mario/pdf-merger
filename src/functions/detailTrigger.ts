@@ -3,6 +3,7 @@
 // ADR-003: ETag-Retry-Logik für Race Conditions
 // ADR-010: Inkrementelles Einfügen nach jedem Detail-Match
 // ADR-011: Blob-Lease über mergeIncrementally
+// ADR-012: Prefix-Matching für Detail-PDF-Zuordnung
 import { app, InvocationContext } from "@azure/functions";
 import {
   listPendingMasterEntities,
@@ -24,12 +25,14 @@ export async function detailTrigger(
 ): Promise<void> {
   context.log(`detailTrigger: Verarbeite "${name}"`);
 
-  const reservationNumber = name.replace(/\.pdf$/i, "");
+  const detailNameWithoutExt = name.replace(/\.pdf$/i, "");
   const pendingMasters = await listPendingMasterEntities();
 
+  // ADR-012: Prefix-Matching – Detail-PDF-Name beginnt mit Reservierungsnummer
+  // Beispiel: "201468964" beginnt mit Reservierungsnummer "20146896"
   const matchedMaster = pendingMasters.find((m) => {
     const missing: string[] = JSON.parse(m.missingDetails);
-    return missing.includes(reservationNumber);
+    return missing.some((resNum) => detailNameWithoutExt.startsWith(resNum));
   });
 
   if (!matchedMaster) {
@@ -40,13 +43,29 @@ export async function detailTrigger(
     return;
   }
 
+  // Matchende Reservierungsnummer per Prefix bestimmen
+  const missingList: string[] = JSON.parse(matchedMaster.missingDetails);
+  const matchedReservationNumber = missingList.find((resNum) =>
+    detailNameWithoutExt.startsWith(resNum)
+  );
+  if (!matchedReservationNumber) {
+    // Defensiver Guard – sollte durch den obigen find nicht auftreten
+    context.warn(
+      `WARN: Reservierungsnummer für "${name}" nach Match nicht mehr auffindbar`
+    );
+    await upsertDetailPdfEntity(name, "unmatched", "");
+    return;
+  }
+
   await upsertDetailPdfEntity(name, "matched", matchedMaster.rowKey);
-  context.log(`detailTrigger: "${name}" matched mit Master "${matchedMaster.rowKey}"`);
+  context.log(
+    `detailTrigger: "${name}" matched mit Reservierung "${matchedReservationNumber}" in Master "${matchedMaster.rowKey}"`
+  );
 
   // ETag-gesichertes Update (ADR-003: Race Condition Handling)
   const updatedMissing = await updateMasterPdfMissingDetails(
     matchedMaster.rowKey,
-    reservationNumber
+    matchedReservationNumber
   );
 
   context.log(
@@ -54,7 +73,8 @@ export async function detailTrigger(
   );
 
   // ADR-010: Inkrementelles Einfügen bei jedem Match (nicht erst am Ende)
-  await mergeIncrementally(matchedMaster.rowKey, reservationNumber, context);
+  // ADR-012: tatsächlichen Blob-Namen übergeben (ggf. mit Extra-Ziffern)
+  await mergeIncrementally(matchedMaster.rowKey, matchedReservationNumber, name, context);
 }
 
 // Registrierung nur außerhalb von Testumgebungen (ADR-008)
