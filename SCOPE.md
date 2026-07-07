@@ -17,7 +17,7 @@ Erstellung einer vollautomatischen TypeScript-Lösung, die mehrere Detail-PDFs d
 - [ ] Einfügen der Detail-PDF **nach der Seite**, auf der der Marker `"Summe: Netto X EUR"` gefunden wurde.
 
 ### 3. Output
-- [ ] Erstellung einer neuen PDF (`output/Master_mit_Details_automatisch.pdf`) mit allen eingefügten Detail-PDFs.
+- [ ] Erstellung einer neuen PDF (`output/<Name_der_Master-PDF>`) mit allen eingefügten Detail-PDFs.
 - [ ] Warnung im Log, falls eine Detail-PDF nicht existiert (Fortsetzung des Skripts).
 
 ---

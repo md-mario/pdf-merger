@@ -22,7 +22,7 @@
 ### 1. Dateien
 | Datei | Beschreibung | Format |
 |-------|--------------|--------|
-| `output/Master_mit_Details_automatisch.pdf` | Neue PDF mit eingefügten Detail-PDFs. | PDF |
+| `output/<Name_der_Master-PDF>` | Neue PDF mit eingefügten Detail-PDFs.  Der Dateiname entspricht dem Namen der Master-PDF. | PDF |
 | `logs/processing-<timestamp>.log` | Log-Datei mit Verarbeitungsdetails. | Text |
 
 ### 2. Azure-Integration (optional)

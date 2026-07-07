@@ -121,12 +121,13 @@ describe("PDF Merger Service", () => {
         context
       );
 
-      expect(result.outputFileName).toBe("Master_mit_Details_automatisch.pdf");
+      // ADR-013: Output-Dateiname = Input-Dateiname
+      expect(result.outputFileName).toBe("Master.pdf");
       expect(result.processedDatasets).toBe(2);
       expect(result.warnings).toHaveLength(0);
       expect(mockUploadBlob).toHaveBeenCalledWith(
         "pdf-output",
-        "Master_mit_Details_automatisch.pdf",
+        "Master.pdf",
         expect.any(Buffer)
       );
     });
@@ -249,10 +250,10 @@ describe("mergeIncrementally", () => {
     const context = createMockContext();
     await mergeIncrementally("Master.pdf", "202174945", "202174945.pdf", context);
 
-    expect(mockAcquireLease).toHaveBeenCalledWith("pdf-output", "Master_mit_Details_automatisch.pdf");
+    expect(mockAcquireLease).toHaveBeenCalledWith("pdf-output", "Master.pdf");
     expect(mockUploadWithLease).toHaveBeenCalledWith(
       "pdf-output",
-      "Master_mit_Details_automatisch.pdf",
+      "Master.pdf",
       expect.any(Buffer),
       "test-lease-id"
     );
@@ -270,7 +271,7 @@ describe("mergeIncrementally", () => {
 
     expect(mockUploadBlobIfNotExists).toHaveBeenCalledWith(
       "pdf-output",
-      "Master_mit_Details_automatisch.pdf",
+      "Master.pdf",
       expect.any(Buffer)
     );
   });

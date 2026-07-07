@@ -3,6 +3,7 @@
 // ADR-003: Warnungen bei fehlenden Detail-PDFs, kein Abbruch
 // ADR-010: Inkrementelle Erstellung der Output-PDF
 // ADR-011: Blob Storage Lease für Concurrency-Kontrolle
+// ADR-013: Output-Dateiname = Eingabe-Dateiname (kein statischer Name)
 import { PDFDocument } from "pdf-lib";
 import { InvocationContext } from "@azure/functions";
 import {
@@ -21,7 +22,7 @@ import { MergeResult } from "../contracts/output";
 const INPUT_CONTAINER = "pdf-input";
 const DETAILS_CONTAINER = "pdf-details";
 const OUTPUT_CONTAINER = "pdf-output";
-const OUTPUT_FILENAME = "Master_mit_Details_automatisch.pdf";
+// ADR-013: kein statischer OUTPUT_FILENAME – wird aus masterFileName abgeleitet
 
 /**
  * Extrahiert Datensätze (Reservierungsnummer + Marker-Seite) aus der Master-PDF.
@@ -116,14 +117,14 @@ export async function mergeWithMarker(
   }
 
   const mergedBytes = await masterDoc.save();
-  await uploadBlob(OUTPUT_CONTAINER, OUTPUT_FILENAME, Buffer.from(mergedBytes));
+  await uploadBlob(OUTPUT_CONTAINER, masterFileName, Buffer.from(mergedBytes));
 
   context.log(
-    `PDF-Merger: ${OUTPUT_FILENAME} erstellt – ${insertions.length} Detail-PDFs eingefügt`
+    `PDF-Merger: ${masterFileName} erstellt – ${insertions.length} Detail-PDFs eingefügt`
   );
 
   return {
-    outputFileName: OUTPUT_FILENAME,
+    outputFileName: masterFileName,
     processedDatasets: insertions.length,
     warnings,
   };
@@ -181,9 +182,10 @@ export async function mergeIncrementally(
   const masterBuffer = await downloadBlob(INPUT_CONTAINER, masterFileName);
 
   // Schritt 1: Output-Blob initialisieren wenn noch nicht vorhanden (ADR-010)
-  if (!(await blobExists(OUTPUT_CONTAINER, OUTPUT_FILENAME))) {
+  // ADR-013: Output-Dateiname = masterFileName
+  if (!(await blobExists(OUTPUT_CONTAINER, masterFileName))) {
     try {
-      await uploadBlobIfNotExists(OUTPUT_CONTAINER, OUTPUT_FILENAME, masterBuffer);
+      await uploadBlobIfNotExists(OUTPUT_CONTAINER, masterFileName, masterBuffer);
       context.log(`mergeIncrementally: Output-PDF initialisiert aus "${masterFileName}"`);
     } catch {
       // 412 = anderer Prozess hat inzwischen erstellt – kein Problem
@@ -193,16 +195,16 @@ export async function mergeIncrementally(
   // Schritt 2: Blob-Lease erwerben (ADR-011)
   let lease: { leaseId: string; release: () => Promise<void> };
   try {
-    lease = await acquireOutputBlobLease(OUTPUT_CONTAINER, OUTPUT_FILENAME);
+    lease = await acquireOutputBlobLease(OUTPUT_CONTAINER, masterFileName);
   } catch (err: unknown) {
-    const msg = `WARN: Blob-Lease für "${OUTPUT_FILENAME}" nicht verfügbar: ${String(err)}`;
+    const msg = `WARN: Blob-Lease für "${masterFileName}" nicht verfügbar: ${String(err)}`;
     context.warn(msg);
     throw err; // Azure Functions Retry-Mechanismus greift
   }
 
   try {
     // Schritt 3: Aktuelle Output-PDF laden
-    const currentBuffer = await downloadBlob(OUTPUT_CONTAINER, OUTPUT_FILENAME);
+    const currentBuffer = await downloadBlob(OUTPUT_CONTAINER, masterFileName);
     const pageTexts = await getPageTexts(currentBuffer);
 
     // Schritt 4: Einfügeposition bestimmen
@@ -233,7 +235,7 @@ export async function mergeIncrementally(
     const mergedBytes = await workingDoc.save();
     await uploadBlobWithLease(
       OUTPUT_CONTAINER,
-      OUTPUT_FILENAME,
+      masterFileName,
       Buffer.from(mergedBytes),
       lease.leaseId
     );
