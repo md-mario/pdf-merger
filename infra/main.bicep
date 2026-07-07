@@ -24,6 +24,12 @@ param appInsightsName string
 @description('Name des Log Analytics Workspace')
 param logAnalyticsWorkspaceName string
 
+@description('TTL in Tagen für Detail-PDFs im Container pdf-details (ADR-016)')
+param detailPdfTtlDays int = 30
+
+@description('TTL in Tagen für Master-PDFs im Container pdf-input (ADR-016)')
+param masterPdfTtlDays int = 30
+
 // ─── Storage Account ──────────────────────────────────────────────────────────
 
 resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
@@ -192,3 +198,71 @@ output functionAppName string = functionApp.name
 output functionAppUrl string = 'https://${functionApp.properties.defaultHostName}'
 output appInsightsConnectionString string = appInsights.properties.ConnectionString
 output logAnalyticsWorkspaceId string = logAnalyticsWorkspace.id
+
+// ─── Blob Lifecycle Management Policy (ADR-016) ────────────────────────────
+// Klassifizierung per Container-Prefix (pdf-input=Master, pdf-details=Detail, pdf-output=Output)
+
+resource lifecyclePolicy 'Microsoft.Storage/storageAccounts/managementPolicies@2023-01-01' = {
+  parent: storageAccount
+  name: 'default'
+  properties: {
+    policy: {
+      rules: [
+        {
+          name: 'delete-detail-pdfs'
+          enabled: true
+          type: 'Lifecycle'
+          definition: {
+            actions: {
+              baseBlob: {
+                delete: {
+                  daysAfterModificationGreaterThan: detailPdfTtlDays
+                }
+              }
+            }
+            filters: {
+              blobTypes: [ 'blockBlob' ]
+              prefixMatch: [ 'pdf-details/' ]
+            }
+          }
+        }
+        {
+          name: 'delete-master-pdfs'
+          enabled: true
+          type: 'Lifecycle'
+          definition: {
+            actions: {
+              baseBlob: {
+                delete: {
+                  daysAfterModificationGreaterThan: masterPdfTtlDays
+                }
+              }
+            }
+            filters: {
+              blobTypes: [ 'blockBlob' ]
+              prefixMatch: [ 'pdf-input/' ]
+            }
+          }
+        }
+        {
+          name: 'delete-output-pdfs'
+          enabled: true
+          type: 'Lifecycle'
+          definition: {
+            actions: {
+              baseBlob: {
+                delete: {
+                  daysAfterModificationGreaterThan: masterPdfTtlDays
+                }
+              }
+            }
+            filters: {
+              blobTypes: [ 'blockBlob' ]
+              prefixMatch: [ 'pdf-output/' ]
+            }
+          }
+        }
+      ]
+    }
+  }
+}

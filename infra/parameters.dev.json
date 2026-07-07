@@ -19,6 +19,12 @@
     },
     "logAnalyticsWorkspaceName": {
       "value": "pdf-merger-dev-logs"
+    },
+    "detailPdfTtlDays": {
+      "value": 30
+    },
+    "masterPdfTtlDays": {
+      "value": 30
     }
   }
 }
