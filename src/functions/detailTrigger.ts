@@ -5,6 +5,7 @@
 // ADR-011: Blob-Lease über mergeIncrementally
 // ADR-012: Prefix-Matching für Detail-PDF-Zuordnung
 // ADR-015: Normalisierung von Dateinamen mit SCI-Präfix
+// ADR-017: Queue-Message nach MasterPDF-Update
 import { app, InvocationContext } from "@azure/functions";
 import {
   listPendingMasterEntities,
@@ -13,6 +14,7 @@ import {
 } from "../infrastructure/tableStorage";
 import { mergeIncrementally } from "../services/pdf-merger";
 import { normalizeFileName } from "../utils/fileNameUtils";
+import { sendMasterPdfEvent } from "../infrastructure/queueStorage";
 
 /**
  * Verarbeitet eine neu hochgeladene Detail-PDF:
@@ -79,6 +81,20 @@ export async function detailTrigger(
   // ADR-010: Inkrementelles Einfügen bei jedem Match (nicht erst am Ende)
   // ADR-012: tatsächlichen Blob-Namen übergeben (ggf. mit Extra-Ziffern)
   await mergeIncrementally(matchedMaster.rowKey, matchedReservationNumber, name, context);
+
+  // ADR-017: Queue-Event nach MasterPDF-Update
+  const updatedStatus = updatedMissing.length === 0 ? "completed" : "pending";
+  await sendMasterPdfEvent({
+    eventType: "MasterPdfUpserted",
+    timestamp: new Date().toISOString(),
+    partitionKey: "MasterPDFs",
+    rowKey: matchedMaster.rowKey,
+    masterPdfName: matchedMaster.rowKey,
+    status: updatedStatus,
+    missingDetails: updatedMissing,
+    missingDetailCount: updatedMissing.length,
+    downloadPath: `/api/download/${encodeURIComponent(matchedMaster.rowKey)}`,
+  });
 }
 
 // Registrierung nur außerhalb von Testumgebungen (ADR-008)

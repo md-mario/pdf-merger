@@ -8,6 +8,7 @@
     "build:watch": "tsc --watch",
     "prestart": "npm run build",
     "start": "func start",
+    "azurite": "azurite --silent --location --skipApiVersionCheck ./azurite --debug ./azurite/debug.log",
     "test": "jest",
     "lint": "eslint \"src/**/*.ts\""
   },
@@ -17,7 +18,10 @@
   "dependencies": {
     "@azure/data-tables": "^13.0.0",
     "@azure/functions": "^4.7.0",
+    "@azure/identity": "^4.13.1",
     "@azure/storage-blob": "^12.27.0",
+    "@azure/storage-queue": "^12.31.0",
+    "@microsoft/microsoft-graph-client": "^3.0.7",
     "pdf-lib": "^1.17.1",
     "pdf-parse": "^1.1.1"
   },

@@ -1,6 +1,7 @@
 // ADR-005: Blob Storage Trigger auf Container "pdf-input"
 // ADR-008: context.log für Entwicklungsumgebung
 // ADR-015: Normalisierung von Dateinamen mit SCI-Präfix (Rescan)
+// ADR-017: Queue-Message nach MasterPDF-Upsert
 import { app, InvocationContext } from "@azure/functions";
 import { getPageTexts, extractReservationNumber } from "../utils/pdfReaderAsync";
 import { normalizeFileName } from "../utils/fileNameUtils";
@@ -11,6 +12,7 @@ import {
   updateMasterPdfMissingDetails,
 } from "../infrastructure/tableStorage";
 import { mergeIncrementally } from "../services/pdf-merger";
+import { sendMasterPdfEvent } from "../infrastructure/queueStorage";
 
 /**
  * Verarbeitet eine neu hochgeladene Master-PDF:
@@ -40,10 +42,23 @@ export async function masterTrigger(
 
   await upsertMasterPdfEntity(
     name,
-    "pending",
+    "new",
     reservationNumbers,
     reservationNumbers // missingDetails = alle Reservierungsnummern initial
   );
+
+  // ADR-017: Queue-Event nach initialem Upsert
+  await sendMasterPdfEvent({
+    eventType: "MasterPdfUpserted",
+    timestamp: new Date().toISOString(),
+    partitionKey: "MasterPDFs",
+    rowKey: name,
+    masterPdfName: name,
+    status: "new",
+    missingDetails: reservationNumbers,
+    missingDetailCount: reservationNumbers.length,
+    downloadPath: `/api/download/${encodeURIComponent(name)}`,
+  });
 
   context.log(
     `masterTrigger: "${name}" gespeichert – ${reservationNumbers.length} Reservierungsnummer(n): ${reservationNumbers.join(", ")}`
@@ -65,8 +80,22 @@ export async function masterTrigger(
     );
 
     await upsertDetailPdfEntity(detail.rowKey, "matched", name);
-    await updateMasterPdfMissingDetails(name, matchedResNum);
+    const updatedMissing = await updateMasterPdfMissingDetails(name, matchedResNum);
     await mergeIncrementally(name, matchedResNum, detail.rowKey, context);
+
+    // ADR-017: Queue-Event nach Rescan-Update
+    const updatedStatus = updatedMissing.length === 0 ? "completed" : "pending";
+    await sendMasterPdfEvent({
+      eventType: "MasterPdfUpserted",
+      timestamp: new Date().toISOString(),
+      partitionKey: "MasterPDFs",
+      rowKey: name,
+      masterPdfName: name,
+      status: updatedStatus,
+      missingDetails: updatedMissing,
+      missingDetailCount: updatedMissing.length,
+      downloadPath: `/api/download/${encodeURIComponent(name)}`,
+    });
   }
 }
 

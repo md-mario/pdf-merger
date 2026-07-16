@@ -3,6 +3,7 @@ jest.mock("@azure/functions", () => ({
 }));
 jest.mock("../src/infrastructure/tableStorage");
 jest.mock("../src/services/pdf-merger");
+jest.mock("../src/infrastructure/queueStorage");
 
 import { detailTrigger } from "../src/functions/detailTrigger";
 import {
@@ -11,6 +12,7 @@ import {
   upsertDetailPdfEntity,
 } from "../src/infrastructure/tableStorage";
 import { mergeIncrementally } from "../src/services/pdf-merger";
+import { sendMasterPdfEvent } from "../src/infrastructure/queueStorage";
 import { MasterPdfRow } from "../src/contracts/input";
 import { InvocationContext } from "@azure/functions";
 
@@ -26,6 +28,7 @@ const mockUpsertDetail = upsertDetailPdfEntity as jest.MockedFunction<
 const mockMergeIncrementally = mergeIncrementally as jest.MockedFunction<
   typeof mergeIncrementally
 >;
+const mockSendEvent = sendMasterPdfEvent as jest.MockedFunction<typeof sendMasterPdfEvent>;
 
 function createMockContext(): InvocationContext {
   return {
@@ -59,6 +62,7 @@ describe("Detail Trigger", () => {
     mockUpdateMissing.mockResolvedValue(["20169310"]);
     mockUpsertDetail.mockResolvedValue(undefined);
     mockMergeIncrementally.mockResolvedValue(undefined);
+    mockSendEvent.mockResolvedValue(undefined);
   });
 
   it("sollte DetailPDFs-Eintrag als matched speichern und missingDetails aktualisieren", async () => {

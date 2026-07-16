@@ -29,9 +29,10 @@ export interface MasterPdfRow {
   rowKey: string;
   etag?: string;
   timestamp?: Date;
-  status: "pending" | "completed" | "failed";
+  status: "new" | "pending" | "completed" | "failed";
   reservationNumbers: string; // JSON-serialized string[]
   missingDetails: string;     // JSON-serialized string[]
+  sharePointItemId?: string;  // SharePoint-Listen-Item-ID für direktes Update ohne Suchabfrage
 }
 
 export interface DetailPdfRow {

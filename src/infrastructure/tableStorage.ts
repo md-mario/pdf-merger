@@ -95,13 +95,28 @@ export async function listPendingMasterEntities(): Promise<MasterPdfRow[]> {
   const results: MasterPdfRow[] = [];
   const entities = client.listEntities<MasterPdfRow>({
     queryOptions: {
-      filter: `PartitionKey eq 'MasterPDFs' and status eq 'pending'`,
+      filter: `PartitionKey eq 'MasterPDFs' and (status eq 'pending' or status eq 'new')`,
     },
   });
   for await (const entity of entities) {
     results.push(entity as MasterPdfRow);
   }
   return results;
+}
+
+/**
+ * Speichert die SharePoint-Listen-Item-ID am Master-Eintrag.
+ * Ermöglicht direktes PATCH-Update ohne erneute Suchabfrage (ADR-020).
+ */
+export async function saveSharePointItemId(
+  rowKey: string,
+  sharePointItemId: string
+): Promise<void> {
+  const client = getTableClient("MasterPDFs");
+  await client.updateEntity(
+    { partitionKey: "MasterPDFs", rowKey, sharePointItemId },
+    "Merge"
+  );
 }
 
 // ─── DetailPDFs ───────────────────────────────────────────────────────────────

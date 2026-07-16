@@ -5,6 +5,7 @@ jest.mock("@azure/functions", () => ({
 jest.mock("../src/infrastructure/tableStorage");
 jest.mock("../src/utils/pdfReaderAsync");
 jest.mock("../src/services/pdf-merger");
+jest.mock("../src/infrastructure/queueStorage");
 
 import { masterTrigger } from "../src/functions/masterTrigger";
 import {
@@ -14,6 +15,7 @@ import {
   updateMasterPdfMissingDetails,
 } from "../src/infrastructure/tableStorage";
 import { mergeIncrementally } from "../src/services/pdf-merger";
+import { sendMasterPdfEvent } from "../src/infrastructure/queueStorage";
 import { getPageTexts, extractReservationNumber } from "../src/utils/pdfReaderAsync";
 import { InvocationContext } from "@azure/functions";
 import { DetailPdfRow } from "../src/contracts/input";
@@ -23,6 +25,7 @@ const mockListUnmatched = listUnmatchedDetailEntities as jest.MockedFunction<typ
 const mockUpsertDetail = upsertDetailPdfEntity as jest.MockedFunction<typeof upsertDetailPdfEntity>;
 const mockUpdateMissing = updateMasterPdfMissingDetails as jest.MockedFunction<typeof updateMasterPdfMissingDetails>;
 const mockMergeIncrementally = mergeIncrementally as jest.MockedFunction<typeof mergeIncrementally>;
+const mockSendEvent = sendMasterPdfEvent as jest.MockedFunction<typeof sendMasterPdfEvent>;
 const mockGetPageTexts = getPageTexts as jest.MockedFunction<typeof getPageTexts>;
 const mockExtractReservationNumber = extractReservationNumber as jest.MockedFunction<typeof extractReservationNumber>;
 
@@ -54,6 +57,7 @@ describe("Master Trigger", () => {
     mockUpsertDetail.mockResolvedValue(undefined);
     mockUpdateMissing.mockResolvedValue([]);
     mockMergeIncrementally.mockResolvedValue(undefined);
+    mockSendEvent.mockResolvedValue(undefined);
     mockGetPageTexts.mockResolvedValue([
       { pageNumber: 1, text: "Reservierungsnummer: 202174945" },
       { pageNumber: 2, text: "Reservierungsnummer: 20169310" },
@@ -64,17 +68,31 @@ describe("Master Trigger", () => {
     });
   });
 
-  it("sollte MasterPDFs-Eintrag mit Status pending erstellen", async () => {
+  it("sollte MasterPDFs-Eintrag mit Status new erstellen", async () => {
     const context = createMockContext();
     await masterTrigger(Buffer.from("mock pdf"), context, "Master.pdf");
 
     expect(mockUpsertMaster).toHaveBeenCalledWith(
       "Master.pdf",
-      "pending",
+      "new",
       ["202174945", "20169310"],
       ["202174945", "20169310"]
     );
     expect(context.warn).not.toHaveBeenCalled();
+  });
+
+  it("sollte Queue-Event nach initialem Upsert senden (ADR-017)", async () => {
+    const context = createMockContext();
+    await masterTrigger(Buffer.from("mock pdf"), context, "Master.pdf");
+
+    expect(mockSendEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: "MasterPdfUpserted",
+        rowKey: "Master.pdf",
+        status: "new",
+        missingDetailCount: 2,
+      })
+    );
   });
 
   it("sollte Warnung ausgeben wenn keine Reservierungsnummern gefunden", async () => {
@@ -87,7 +105,7 @@ describe("Master Trigger", () => {
     expect(context.warn).toHaveBeenCalledWith(
       expect.stringContaining('Keine Reservierungsnummern in "Master.pdf" gefunden')
     );
-    expect(mockUpsertMaster).toHaveBeenCalledWith("Master.pdf", "pending", [], []);
+    expect(mockUpsertMaster).toHaveBeenCalledWith("Master.pdf", "new", [], []);
   });
 
   it("sollte Reservierungsnummern deduplizieren", async () => {
@@ -102,7 +120,7 @@ describe("Master Trigger", () => {
 
     expect(mockUpsertMaster).toHaveBeenCalledWith(
       "Master.pdf",
-      "pending",
+      "new",
       ["202174945"],
       ["202174945"]
     );

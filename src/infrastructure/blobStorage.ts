@@ -1,6 +1,7 @@
 // ADR-002: Azure Blob Storage für Input/Output der PDFs
 // ADR-011: Blob Storage Lease für pessimistisches Locking der Output-PDF
-import { BlobServiceClient } from "@azure/storage-blob";
+// ADR-018: SAS URL-Erzeugung für Download-Function
+import { BlobServiceClient, BlobSASPermissions } from "@azure/storage-blob";
 
 const connectionString =
   process.env["AZURE_STORAGE_CONNECTION_STRING"] ?? "UseDevelopmentStorage=true";
@@ -151,5 +152,25 @@ export async function uploadBlobWithLease(
   await client.upload(data, data.length, {
     blobHTTPHeaders: { blobContentType: "application/pdf" },
     conditions: { leaseId },
+  });
+}
+
+// ─── ADR-018: SAS URL für Download-Function ───────────────────────────────────
+
+/**
+ * Erzeugt einen kurzlebigen, schreibgeschützten SAS-Link für einen Blob.
+ * SAS-Token wird NICHT gespeichert – nur zur Laufzeit erzeugt (ADR-018).
+ */
+export async function createReadOnlySasUrl(
+  containerName: string,
+  blobName: string,
+  expiresInMinutes = 5
+): Promise<string> {
+  const blobClient = getBlobServiceClient()
+    .getContainerClient(containerName)
+    .getBlobClient(blobName);
+  return blobClient.generateSasUrl({
+    permissions: BlobSASPermissions.from({ read: true }),
+    expiresOn: new Date(Date.now() + expiresInMinutes * 60 * 1000),
   });
 }
