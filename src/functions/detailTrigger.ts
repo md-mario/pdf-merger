@@ -16,6 +16,12 @@ import { mergeIncrementally } from "../services/pdf-merger";
 import { normalizeFileName } from "../utils/fileNameUtils";
 import { sendMasterPdfEvent } from "../infrastructure/queueStorage";
 
+/** Baut den Download-Pfad inkl. optionalem Function Key (ADR-018). */
+function buildDownloadPath(rowKey: string): string {
+  const code = process.env["DOWNLOAD_FUNCTION_KEY"];
+  return `/api/download/${encodeURIComponent(rowKey)}${code ? `?code=${code}` : ""}`;
+}
+
 /**
  * Verarbeitet eine neu hochgeladene Detail-PDF:
  * - Sucht zugehörige Master-PDF in Table Storage (MasterPDFs, Status "pending")
@@ -93,7 +99,7 @@ export async function detailTrigger(
     status: updatedStatus,
     missingDetails: updatedMissing,
     missingDetailCount: updatedMissing.length,
-    downloadPath: `/api/download/${encodeURIComponent(matchedMaster.rowKey)}`,
+    downloadPath: buildDownloadPath(matchedMaster.rowKey),
   });
 }
 

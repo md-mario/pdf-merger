@@ -14,6 +14,12 @@ import {
 import { mergeIncrementally } from "../services/pdf-merger";
 import { sendMasterPdfEvent } from "../infrastructure/queueStorage";
 
+/** Baut den Download-Pfad inkl. optionalem Function Key (ADR-018). */
+function buildDownloadPath(rowKey: string): string {
+  const code = process.env["DOWNLOAD_FUNCTION_KEY"];
+  return `/api/download/${encodeURIComponent(rowKey)}${code ? `?code=${code}` : ""}`;
+}
+
 /**
  * Verarbeitet eine neu hochgeladene Master-PDF:
  * - Extrahiert Reservierungsnummern seitenweise
@@ -57,7 +63,7 @@ export async function masterTrigger(
     status: "new",
     missingDetails: reservationNumbers,
     missingDetailCount: reservationNumbers.length,
-    downloadPath: `/api/download/${encodeURIComponent(name)}`,
+    downloadPath: buildDownloadPath(name),
   });
 
   context.log(
