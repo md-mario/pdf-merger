@@ -126,6 +126,32 @@ describe("Master Trigger", () => {
     );
   });
 
+  describe("Fehlerbehandlung: Status 'failed'", () => {
+    it("sollte Status 'failed' setzen und Event senden wenn PDF-Verarbeitung fehlschlägt", async () => {
+      mockGetPageTexts.mockRejectedValue(new Error("PDF konnte nicht gelesen werden"));
+      const context = createMockContext();
+
+      await expect(masterTrigger(Buffer.from("kein pdf"), context, "Master.pdf")).rejects.toThrow(
+        "PDF konnte nicht gelesen werden"
+      );
+
+      expect(mockUpsertMaster).toHaveBeenCalledWith("Master.pdf", "failed", [], []);
+      expect(mockSendEvent).toHaveBeenCalledWith(
+        expect.objectContaining({ status: "failed", rowKey: "Master.pdf" })
+      );
+      expect(context.error).toHaveBeenCalled();
+    });
+
+    it("sollte Fehler weiterwerfen damit Azure Functions Retry greift", async () => {
+      mockGetPageTexts.mockRejectedValue(new Error("Storage nicht erreichbar"));
+      const context = createMockContext();
+
+      await expect(masterTrigger(Buffer.from("x"), context, "Master.pdf")).rejects.toThrow(
+        "Storage nicht erreichbar"
+      );
+    });
+  });
+
   describe("Rescan: Details vor Master hochgeladen", () => {
     it("sollte keine Rescan-Aktion ausführen wenn keine unmatched Details vorhanden", async () => {
       mockListUnmatched.mockResolvedValue([]);

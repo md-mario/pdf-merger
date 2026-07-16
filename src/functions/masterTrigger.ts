@@ -32,6 +32,7 @@ export async function masterTrigger(
 ): Promise<void> {
   context.log(`masterTrigger: Verarbeite "${name}"`);
 
+  try {
   const pageTexts = await getPageTexts(blob);
   const reservationNumbers: string[] = [];
 
@@ -100,8 +101,28 @@ export async function masterTrigger(
       status: updatedStatus,
       missingDetails: updatedMissing,
       missingDetailCount: updatedMissing.length,
-      downloadPath: `/api/download/${encodeURIComponent(name)}`,
+      downloadPath: buildDownloadPath(name),
     });
+  }
+  } catch (err) {
+    context.error(`masterTrigger: Verarbeitung von "${name}" fehlgeschlagen:`, err);
+    try {
+      await upsertMasterPdfEntity(name, "failed", [], []);
+      await sendMasterPdfEvent({
+        eventType: "MasterPdfUpserted",
+        timestamp: new Date().toISOString(),
+        partitionKey: "MasterPDFs",
+        rowKey: name,
+        masterPdfName: name,
+        status: "failed",
+        missingDetails: [],
+        missingDetailCount: 0,
+        downloadPath: buildDownloadPath(name),
+      });
+    } catch (innerErr) {
+      context.error(`masterTrigger: Status-Update auf "failed" fehlgeschlagen für "${name}":`, innerErr);
+    }
+    throw err; // Azure Functions Retry-Mechanismus auslösen
   }
 }
 
